@@ -26,3 +26,10 @@ npm run build
 The motion regression check covers nonmonotonic animation timestamps and verifies bounded convergence. Browser visual checks cover assembled/exploded states, camera macro, photo reveal, pause, reset, finish switching, and a 390-pixel layout. These are not measured frame-rate benchmarks or exhaustive device coverage.
 
 Optional WebMCP registration is feature-detected and validates assembly IDs and the 0–100 explosion range.
+
+## Vercel
+
+Import this repository in Vercel. The included `vercel.json` builds the same interactive app as a static Vite application using `npm run build:vercel` and publishes `dist-vercel`. No environment variables, database, paid 3D software, or server functions are required.
+
+For the Vercel version locally, run `npm ci` and `npm run dev:vercel`.
+The original `npm run dev` and `npm run build` commands retain the Sites/Cloudflare build path.
