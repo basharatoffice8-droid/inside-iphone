@@ -1,66 +1,530 @@
 'use client';
-import {useEffect,useRef} from 'react';
+import { useEffect, useRef } from 'react';
 import * as T from 'three';
-import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
-type Props={explode:number;selected:string|null;isolated:boolean;color:string;rotating:boolean;view:number;zoom:number;step:number;onSelect:(id:string)=>void;onReady:()=>void;onError:(s:string)=>void};
-export default function Scene(props:Props){const el=useRef<HTMLDivElement>(null),latest=useRef(props);latest.current=props;
-useEffect(()=>{if(!el.current)return;const host=el.current;let renderer:T.WebGLRenderer;try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'})}catch{latest.current.onError('3D could not start. Enable hardware acceleration in your browser, then try again.');return}
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.92;renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;host.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label','3D iPhone 17 Pro. Drag to rotate. Use the assembly list to select parts.');
-const scene=new T.Scene();scene.background=new T.Color('#07090c');scene.fog=new T.Fog('#07090c',19,48);const camera=new T.PerspectiveCamera(38,1,.1,100);camera.position.set(0,1.0,14.8);const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=5;controls.maxDistance=25;controls.enablePan=false;controls.target.set(0,0,0);
-const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment(),env=pmrem.fromScene(room,.04);scene.environment=env.texture;room.dispose();pmrem.dispose();scene.add(new T.HemisphereLight(0xc9dcff,0x343b44,.7));const key=new T.DirectionalLight(0xffffff,2.4);key.position.set(-4,8,6);key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-8,right:8,top:8,bottom:-8});key.shadow.bias=-.0003;key.shadow.normalBias=.025;scene.add(key);const rim=new T.DirectionalLight(0xc8ddff,2.5);rim.position.set(-4,1,-4);scene.add(rim);
-const root=new T.Group();scene.add(root);root.rotation.set(-.10,-.48,0);
-const groups:Record<string,T.Group>={},origins:Record<string,T.Vector3>={},targets:Record<string,T.Vector3>={};const pickables:T.Object3D[]=[],resources:(T.BufferGeometry|T.Material|T.Texture)[]=[];
-const mat=(color:string,metalness=.5,roughness=.3)=>{const m=new T.MeshStandardMaterial({color,metalness,roughness});resources.push(m);return m};const orange=mat('#ce713b',.85,.27),orangeGlass=mat('#e8a276',.55,.3),edge=mat('#f3b181',.9,.19),black=mat('#12171b',.55,.28),dark=mat('#22272b',.8,.34),silver=mat('#b5bdc6',.92,.24),gold=mat('#c39142',.86,.3),copper=mat('#c8774f',.9,.33),green=mat('#164a3c',.5,.5),lens=mat('#081323',.75,.12),lensBlue=mat('#174977',.85,.12);
-function group(id:string,x=0,y=0,z=0,tx=0,ty=0,tz=0){const g=new T.Group();g.position.set(x,y,z);g.userData.part=id;root.add(g);groups[id]=g;origins[id]=g.position.clone();targets[id]=new T.Vector3(tx,ty,tz);return g}
-function mesh(g:T.Group,geo:T.BufferGeometry,m:T.Material,x=0,y=0,z=0){resources.push(geo);const o=new T.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);pickables.push(o);return o}
-function box(g:T.Group,w:number,h:number,d:number,m:T.Material,x=0,y=0,z=0,r=.06){if(w>2&&h>1){const radius=Math.min(w/2-.001,h/2-.001,w>2.6&&h>3?.32:.16);const shape=new T.Shape();const a=-w/2,b=-h/2;shape.moveTo(a+radius,b);shape.lineTo(a+w-radius,b);shape.quadraticCurveTo(a+w,b,a+w,b+radius);shape.lineTo(a+w,b+h-radius);shape.quadraticCurveTo(a+w,b+h,a+w-radius,b+h);shape.lineTo(a+radius,b+h);shape.quadraticCurveTo(a,b+h,a,b+h-radius);shape.lineTo(a,b+radius);shape.quadraticCurveTo(a,b,a+radius,b);const bevel=Math.min(d*.18,.022);const geo=new T.ExtrudeGeometry(shape,{depth:Math.max(.001,d-2*bevel),bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,steps:1,curveSegments:16});geo.translate(0,0,-d/2+bevel);geo.computeVertexNormals();return mesh(g,geo,m,x,y,z)}return mesh(g,new RoundedBoxGeometry(w,h,d,4,Math.min(r,d/2,w/2,h/2)),m,x,y,z)}
-function cyl(g:T.Group,r:number,h:number,m:T.Material,x=0,y=0,z=0){const o=mesh(g,new T.CylinderGeometry(r,r,h,48),m,x,y,z);o.rotation.x=Math.PI/2;return o}
-function ring(g:T.Group,r:number,t:number,m:T.Material,x=0,y=0,z=0){return mesh(g,new T.TorusGeometry(r,t,8,64),m,x,y,z)}
-function label(g:T.Group,text:string,w:number,h:number,x:number,y:number,z:number,color='#acb5bc',bg='transparent'){const c=document.createElement('canvas');c.width=512;c.height=256;const ctx=c.getContext('2d')!;if(bg!=='transparent'){ctx.fillStyle=bg;ctx.fillRect(0,0,512,256)}ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='500 60px Arial';text.split('\n').forEach((s,i,a)=>ctx.fillText(s,256,128+(i-(a.length-1)/2)*70));const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;resources.push(t);const m=new T.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:T.DoubleSide});resources.push(m);return mesh(g,new T.PlaneGeometry(w,h),m,x,y,z)}
-// Exterior uses the 150 × 71.9 mm silhouette. All internal geometry is illustrative.
-const frame=group('frame',0,0,0,-2.7,0,-.6);box(frame,2.876,6,.35,orange,0,0,0,.17);box(frame,2.71,5.82,.03,black,0,0,-.183,.014);box(frame,2.70,4.10,.024,orangeGlass,0,-.77,.204,.01);box(frame,2.75,1.65,.19,orange,0,2.07,.22,.09);
-// Side controls and antenna breaks.
-box(frame,.052,.54,.14,edge,1.454,.76,0,.02);box(frame,.052,.4,.13,edge,1.454,-1.30,0,.02);box(frame,.048,.25,.14,edge,-1.454,1.77,0,.02);box(frame,.048,.38,.14,edge,-1.454,1.17,0,.02);box(frame,.048,.38,.14,edge,-1.454,.65,0,.02);
-for(const y of [-2.55,2.55])for(const x of [-1.442,1.442])box(frame,.02,.05,.34,silver,x,y,0,.009);
-for(let i=0;i<6;i++){const hole=cyl(frame,.023,.02,black,-.83+i*.09,-3.005,0);hole.rotation.x=0;const h2=cyl(frame,.023,.02,black,.38+i*.09,-3.005,0);h2.rotation.x=0}
-// Small inset maker-style mark; no surface text or exposed internal coil.
-const mark=mat('#8d939b',.75,.32);const markShape=new T.Shape();markShape.moveTo(0,.10);markShape.bezierCurveTo(-.30,.30,-.34,-.14,-.13,-.32);markShape.bezierCurveTo(-.04,-.40,0,-.31,.08,-.34);markShape.bezierCurveTo(.18,-.40,.31,-.18,.28,-.12);markShape.bezierCurveTo(.13,-.10,.11,.08,.28,.12);markShape.bezierCurveTo(.18,.30,.08,.18,0,.10);mesh(frame,new T.ShapeGeometry(markShape,24),mark,0,-.53,.222);const leaf=mesh(frame,new T.SphereGeometry(.09,20,12),mark,.055,-.33,.222);leaf.scale.set(.5,1,.08);leaf.rotation.z=-.65;
-const display=group('display',0,0,-.235,3.0,0,1.0);box(display,2.77,5.9,.08,dark,0,0,0,.04);box(display,2.65,5.72,.015,black,0,0,-.049,.007);box(display,2.65,5.72,.015,black,0,0,.049,.007);const screenMat=new T.MeshStandardMaterial({color:'#111b30',metalness:.35,roughness:.22,emissive:'#153864',emissiveIntensity:.25});resources.push(screenMat);box(display,2.61,5.64,.012,screenMat,0,0,-.060,.006);const screenText=label(display,'9:41',1.55,.65,0,1.85,-.074,'#e6e9f0');screenText.rotation.y=Math.PI;box(display,.82,.20,.02,black,0,2.51,-.077,.009);box(display,.74,.034,.014,silver,0,-2.64,-.077,.006);const displayLabel=label(display,'OLED\nDISPLAY',1.35,.75,0,0,.062,'#718190');
-const photoMap=new T.TextureLoader().load('/photo-reference.jpg',()=>{dirty=true});photoMap.colorSpace=T.SRGBColorSpace;photoMap.repeat.set(.36,1);photoMap.offset.set(.32,0);resources.push(photoMap);const photoMaterial=new T.MeshBasicMaterial({map:photoMap});resources.push(photoMaterial);const photoPanel=mesh(display,new T.PlaneGeometry(2.56,5.54),photoMaterial,0,0,.075);photoPanel.visible=false;
-const cam=group('camera',0,2.07,.42,0,2.4,1.25);box(cam,2.50,1.38,.09,orange,0,0,-.18,.07);const cs=[[-.79,.37],[-.79,-.38],[.03,0]];for(const [x,y] of cs){cyl(cam,.356,.13,edge,x,y,0);cyl(cam,.316,.145,black,x,y,.065);ring(cam,.285,.015,silver,x,y,.142);cyl(cam,.268,.015,lens,x,y,.146);ring(cam,.183,.006,lensBlue,x,y,.16);cyl(cam,.133,.017,lensBlue,x,y,.168);cyl(cam,.085,.018,lens,x,y,.182);const shine=mat('#94acd8',.5,.13);cyl(cam,.036,.006,shine,x-.082,y+.08,.189);for(let i=0;i<3;i++)cyl(cam,.22-i*.018,.025,lens,x,y,-.28-i*.07)}cyl(cam,.115,.06,mat('#f7e5c7',.2,.4),.87,.37,.07);cyl(cam,.102,.04,black,.87,-.37,.07);cyl(cam,.032,.01,black,1.12,0,.085);
-const chip=group('chip',.69,.45,-.01,2.7,1.75,.55);box(chip,1.03,2.03,.09,green,0,0,0,.04);box(chip,.7,.7,.10,dark,0,.27,.09,.03);label(chip,'A19\nPRO',.57,.4,0,.28,.15,'#d6dade');for(let i=0;i<16;i++){box(chip,.08,.13,.04,gold,-.38+(i%4)*.25,-.65+Math.floor(i/4)*.42,.067,.01)}box(chip,.68,.42,.055,silver,0,-.7,.13,.02);for(let i=0;i<9;i++)box(chip,.045,.10,.045,gold,.48,-.8+i*.2,.02,.01);
-const battery=group('battery',-.42,-.65,-.005,-.65,-.6,1.9);box(battery,1.65,3.25,.12,black,0,0,0,.05);box(battery,1.52,3.08,.02,dark,0,0,.071,.009);label(battery,'Li-ion',.9,.36,0,.76,.09,'#aeb3b5');label(battery,'RECHARGEABLE\nBATTERY',1.3,.46,0,.22,.09,'#7e898f');label(battery,'+     −',.8,.26,0,-.85,.09,'#829097');box(battery,.25,.36,.04,gold,.49,1.73,-.02,.012);
-const coil=group('coil',0,-.6,.15,-2.9,-2.1,1.1);cyl(coil,.99,.025,dark);for(let i=0;i<16;i++)ring(coil,.45+i*.028,.010,copper,0,0,.027);for(let i=0;i<24;i++){const a=i/24*Math.PI*2;const o=box(coil,.17,.11,.03,silver,Math.cos(a)*.94,Math.sin(a)*.94,.046,.013);o.rotation.z=a+Math.PI/2}box(coil,.13,.65,.022,copper,0,-1.18,.027,.01);
-const speaker=group('speaker',.74,-2.4,-.01,2.4,-2.5,.6);box(speaker,1.02,.48,.15,black);box(speaker,.76,.22,.025,silver,0,0,.09,.011);for(let i=0;i<8;i++)cyl(speaker,.035,.028,black,-.3+i*.085,0,.109);
-const port=group('port',0,-2.88,-.01,0,-3.35,1.0);box(port,.53,.20,.27,silver,0,0,0,.06);box(port,.43,.12,.28,black,0,0,.01,.05);box(port,.31,.035,.29,dark,0,0,.02,.016);for(let i=0;i<10;i++)box(port,.014,.035,.03,gold,-.135+i*.03,0,.173,.004);box(port,.65,.35,.028,copper,0,.27,-.04,.012);
-const thermal=group('thermal',0,.40,-.13,-.6,1.4,-1.5);box(thermal,2.25,3.3,.026,copper,0,0,0,.012);box(thermal,1.65,2.7,.011,gold,0,0,.02,.005);for(let i=0;i<13;i++)box(thermal,1.5,.016,.012,copper,0,-1.1+i*.18,.032,.005);label(thermal,'THERMAL\nSPREADER',1.25,.42,0,0,.047,'#5a381b');
-const haptic=group('haptic',-.74,-2.4,-.01,-2.1,-3.3,.2);box(haptic,1.02,.42,.15,silver);box(haptic,.65,.25,.018,dark,0,0,.088,.008);label(haptic,'TAPTIC',.58,.20,0,0,.106,'#d0d4d6');for(const x of [-.42,.42]){cyl(haptic,.034,.028,gold,x,0,.09)}
-// Fine fasteners remain attached to their assemblies.
-for(const [id,g] of Object.entries(groups)){if(['display','camera','coil','port'].includes(id))continue;const y=id==='frame'?2.8:.14;for(const x of [-.3,.3]){cyl(g,.031,.025,silver,x,y,.20);box(g,.03,.006,.006,black,x,y,.216,.002)}}
-// Board-mounted capacitors, shielding seams and copper signal routes.
-for(let row=0;row<18;row++)for(let col=0;col<3;col++){const x=-.40+col*.33,y=-.9+row*.102;if(Math.abs(y-.27)<.42)continue;box(chip,.07,.036,.022,row%3===0?gold:dark,x,y,.083,.008)}
-for(let i=0;i<8;i++){const pts=[new T.Vector3(-.43+i*.045,-.65,.064),new T.Vector3(-.43+i*.045,-.2,.064),new T.Vector3(-.35+i*.045,-.1,.064)];mesh(chip,new T.TubeGeometry(new T.CatmullRomCurve3(pts),8,.004,4,false),gold)}
-const layout:Record<string,T.Vector3>={frame:new T.Vector3(-4,0,-.5),display:new T.Vector3(4,0,-.2),camera:new T.Vector3(0,3.7,.3),chip:new T.Vector3(3.7,3.7,.3),battery:new T.Vector3(-1.45,0,.5),coil:new T.Vector3(-3.7,-3.7,.5),speaker:new T.Vector3(3.6,-3.7,.4),port:new T.Vector3(1.3,-3.7,.4),thermal:new T.Vector3(1.1,0,-.2),haptic:new T.Vector3(-1.2,-3.7,.4)};
-const trail=new T.Group();root.add(trail);const dots:T.Mesh[]=[];const dotMat=new T.MeshBasicMaterial({color:'#ffc78f'});resources.push(dotMat);for(let i=0;i<24;i++){const d=mesh(trail,new T.SphereGeometry(.025,8,8),dotMat);dots.push(d)}trail.visible=false;
-// Sub-pieces expand in a second stage, preserving the assembly before disassembly.
-const pieceHomes=new Map<T.Object3D,T.Vector3>();Object.values(groups).forEach(g=>g.children.forEach(o=>pieceHomes.set(o,o.position.clone())));
-const stage=new T.Group();scene.add(stage);const stageMat=mat('#343e4b',.32,.48);const plinth=new T.Mesh(new T.CylinderGeometry(3.7,3.76,.12,128),stageMat);resources.push(plinth.geometry);plinth.position.y=-3.21;plinth.receiveShadow=true;stage.add(plinth);for(const radius of [3.55,3.66]){const geo=new T.TorusGeometry(radius,.007,6,128);resources.push(geo);const r=new T.Mesh(geo,silver);r.rotation.x=-Math.PI/2;r.position.y=-3.145;stage.add(r)}const floorGeo=new T.PlaneGeometry(160,160);resources.push(floorGeo);const floor=new T.Mesh(floorGeo,mat('#28313e',.08,.84));floor.rotation.x=-Math.PI/2;floor.position.y=-3.29;floor.receiveShadow=true;scene.add(floor);
-const ray=new T.Raycaster(),pointer=new T.Vector2();let down={x:0,y:0};const onDown=(e:PointerEvent)=>{down={x:e.clientX,y:e.clientY}},onUp=(e:PointerEvent)=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>7)return;const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hits=ray.intersectObjects(pickables,false);for(const hit of hits){let o:T.Object3D|null=hit.object;let id:string|undefined;let visible=true;while(o){if(!o.visible)visible=false;if(o.userData.part)id=o.userData.part;o=o.parent}if(id&&visible){latest.current.onSelect(id);break}}};renderer.domElement.addEventListener('pointerdown',onDown);renderer.domElement.addEventListener('pointerup',onUp);
-let dirty=true,last='',amount=0,frameId=0,prev=performance.now(),seenView=props.view,seenZoom=props.zoom;const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const resize=()=>{const w=host.clientWidth,h=host.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();dirty=true};const ro=new ResizeObserver(resize);ro.observe(host);resize();controls.addEventListener('change',()=>{dirty=true});
-function tick(now:number){frameId=requestAnimationFrame(tick);if(document.hidden)return;const dt=Math.min((now-prev)/1000,.05);prev=now;const p=latest.current;const state=JSON.stringify([p.explode,p.selected,p.isolated,p.color,p.view,p.zoom,p.step]);if(state!==last){dirty=true;last=state;const colors=p.color==='silver'?['#aeb5bf','#c6cbd1','#dce1e8']:p.color==='blue'?['#2d3a55','#4d5a76','#7388aa']:['#bd642f','#d38b55','#dea271'];[orange,orangeGlass,edge].forEach((m,i)=>m.color.set(colors[i]));}
-const target=p.isolated?0:p.explode;const moving=Math.abs(amount-target)>.0003;if(moving){amount=reduced?target:T.MathUtils.lerp(amount,target,1-Math.exp(-dt*6));dirty=true}
-if(seenView!==p.view){seenView=p.view;camera.position.set(0,1.0,14.8);controls.target.set(0,0,0);dirty=true}if(seenZoom!==p.zoom){camera.position.multiplyScalar(Math.pow(.86,p.zoom-seenZoom));seenZoom=p.zoom;dirty=true}
-const targetAngle=p.view%2?Math.PI-.45:-.48;if(!p.rotating){const delta=targetAngle-root.rotation.y;if(Math.abs(delta)>.001){root.rotation.y+=delta*Math.min(1,dt*5);dirty=true}}else if(!reduced){root.rotation.y+=dt*.18;dirty=true}
-const mobile=host.clientWidth<1000;const scaleTarget=p.isolated?(mobile?.72:1):(1-amount*.34)*(mobile?.72:1);if(Math.abs(root.scale.x-scaleTarget)>.0001)dirty=true;root.scale.lerp(new T.Vector3(scaleTarget,scaleTarget,scaleTarget),.12);
-for(const [id,g] of Object.entries(groups)){g.visible=p.isolated?p.selected===id:(amount>.025||['frame','camera','display'].includes(id));const aim=p.isolated?new T.Vector3():origins[id].clone().lerp(layout[id],amount);if(g.position.distanceToSquared(aim)>.000001)dirty=true;g.position.lerp(aim,reduced?1:.14)}
-const fine=T.MathUtils.smoothstep(amount,.52,1);for(const [o,home] of pieceHomes){const spread=home.clone();spread.z*=1+fine*2;if(o.position.distanceToSquared(spread)>.000001)dirty=true;o.position.lerp(spread,.14)}stage.visible=amount<.6&&!p.isolated;stage.position.y=3.12*(1-root.scale.x);floor.position.y=-3.29+stage.position.y;floor.visible=amount<.6&&!p.isolated;
-const photoActive=p.step>=0;trail.visible=photoActive;photoPanel.visible=p.step===3;displayLabel.visible=p.step!==3;screenMat.emissive.set(p.step===3?'#9f642b':'#153864');screenMat.emissiveIntensity=p.step===3?1:.25;
-if(photoActive){const a=p.step<2?groups.camera.position.clone().add(new T.Vector3(-.79,.37,1.2)):groups.chip.position.clone();const b=p.step<2?groups.camera.position.clone().add(new T.Vector3(-.79,.37,0)):p.step===2?groups.display.position.clone():groups.display.position.clone().add(new T.Vector3(0,1,0));dots.forEach((d,i)=>{const t=((now/2000+i/24)%1);d.position.lerpVectors(a,b,t);d.position.x+=Math.sin(t*Math.PI)*.25});dirty=true}
-controls.update();if(moving)dirty=true;if(dirty){renderer.render(scene,camera);dirty=false}}
-frameId=requestAnimationFrame(tick);latest.current.onReady();return()=>{cancelAnimationFrame(frameId);ro.disconnect();controls.dispose();renderer.domElement.removeEventListener('pointerdown',onDown);renderer.domElement.removeEventListener('pointerup',onUp);for(const r of new Set(resources))r.dispose();env.dispose();renderer.dispose();renderer.domElement.remove()};
-},[]);return <div ref={el} className="three-host"/>}
-
-
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { buildPhone } from './phone-model';
+import { parts } from './parts';
+import { frameDelta } from './motion';
+type Props = {
+  explode: number;
+  selected: string | null;
+  isolated: boolean;
+  color: string;
+  rotating: boolean;
+  view: number;
+  zoom: number;
+  step: number;
+  playing: boolean;
+  labels: boolean;
+  onSelect: (id: string) => void;
+  onReady: () => void;
+  onError: (s: string) => void;
+};
+const vec = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+export default function Scene(props: Props) {
+  const el = useRef<HTMLDivElement>(null),
+    latest = useRef(props);
+  latest.current = props;
+  useEffect(() => {
+    if (!el.current) return;
+    const host = el.current;
+    let renderer: T.WebGLRenderer;
+    try {
+      renderer = new T.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        powerPreference: 'high-performance',
+      });
+    } catch {
+      latest.current.onError(
+        '3D could not start. Enable browser hardware acceleration and reload.',
+      );
+      return;
+    }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    renderer.outputColorSpace = T.SRGBColorSpace;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.98;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;
+    host.appendChild(renderer.domElement);
+    renderer.domElement.setAttribute(
+      'aria-label',
+      'Interactive iPhone 17 Pro model. Drag to rotate. Scroll to zoom.',
+    );
+    const scene = new T.Scene();
+    scene.background = new T.Color('#0a0d11');
+    scene.fog = new T.Fog('#0a0d11', 22, 48);
+    const camera = new T.PerspectiveCamera(32, 1, 0.05, 100);
+    camera.position.set(0, 0.7, 13);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.075;
+    controls.enablePan = false;
+    controls.minDistance = 1.2;
+    controls.maxDistance = 45;
+    const pmrem = new T.PMREMGenerator(renderer),
+      room = new RoomEnvironment();
+    const env = pmrem.fromScene(room, 0.035);
+    scene.environment = env.texture;
+    room.dispose();
+    pmrem.dispose();
+    scene.environmentIntensity = 0.9;
+    const key = new T.DirectionalLight('#fff5eb', 2.2);
+    key.position.set(-3, 7, 5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, {
+      left: -9,
+      right: 9,
+      top: 9,
+      bottom: -9,
+      near: 0.1,
+      far: 30,
+    });
+    key.shadow.normalBias = 0.015;
+    key.shadow.bias = -0.0003;
+    scene.add(key);
+    const rim = new T.DirectionalLight('#c7d9f0', 2.6);
+    rim.position.set(5, 2, -4);
+    scene.add(rim);
+    const fill = new T.DirectionalLight('#edf3ff', 1.0);
+    fill.position.set(-5, -1, 4);
+    scene.add(fill);
+    scene.add(new T.HemisphereLight('#dce8f7', '#20242a', 0.6));
+    let dirty = true,
+      frameId = 0,
+      cancelled = false,
+      framing = 2,
+      last = '',
+      seenZoom = props.zoom,
+      shownPhoto = false,
+      flowTime = 0;
+    const phone = buildPhone(() => {
+      dirty = true;
+      framing = Math.max(framing, 1);
+    });
+    scene.add(phone.root);
+    phone.root.rotation.set(-0.12, -0.5, 0);
+    const orientationGoal = vec(-0.12, -0.5, 0);
+    const floorMaterial = new T.MeshStandardMaterial({
+      color: '#060a10',
+      roughness: 1,
+      metalness: 0,
+      transparent: true,
+    });
+    const floorGeo = new T.PlaneGeometry(150, 150),
+      floor = new T.Mesh(floorGeo, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -3.035;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    // A narrow display base grounds the phone while leaving the silhouette unobstructed.
+    const baseGeo = new T.CylinderGeometry(2.25, 2.28, 0.065, 100),
+      baseMaterial = new T.MeshStandardMaterial({
+        color: '#242e39',
+        roughness: 0.4,
+        metalness: 0.5,
+        transparent: true,
+      }),
+      base = new T.Mesh(baseGeo, baseMaterial);
+    base.position.y = -3.075;
+    base.receiveShadow = true;
+    scene.add(base);
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const dof = new BokehPass(scene, camera, {
+      focus: 13,
+      aperture: 0.000025,
+      maxblur: 0.003,
+    });
+    composer.addPass(dof);
+    composer.addPass(new OutputPass());
+    const lineMaterial = new T.LineBasicMaterial({
+      color: '#dfc595',
+      transparent: true,
+      opacity: 0.75,
+      depthTest: false,
+    });
+    const lightGeometry = new T.BufferGeometry(),
+      lightPath = new T.Line(lightGeometry, lineMaterial);
+    lightPath.renderOrder = 10;
+    scene.add(lightPath);
+    const dotGeometry = new T.SphereGeometry(0.024, 10, 10),
+      dotMaterial = new T.MeshBasicMaterial({
+        color: '#fff2ce',
+        toneMapped: false,
+        depthTest: false,
+      }),
+      dots = Array.from({ length: 12 }, () => {
+        const o = new T.Mesh(dotGeometry, dotMaterial);
+        o.renderOrder = 11;
+        scene.add(o);
+        return o;
+      });
+    const markers = phone.assemblies.map((a) => {
+      const b = document.createElement('button');
+      b.className = 'scene-marker';
+      b.textContent = parts.find((p) => p.id === a.id)?.name || a.id;
+      b.setAttribute('aria-label', 'Inspect ' + b.textContent);
+      b.addEventListener('click', () => latest.current.onSelect(a.id));
+      host.appendChild(b);
+      return { a, b };
+    });
+    const targetPosition = vec(),
+      wantedCamera = vec(0, 0.7, 13),
+      box = new T.Box3(),
+      size = vec(),
+      center = vec(),
+      direction = vec(),
+      world = vec();
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let amount = 0,
+      prev = performance.now(),
+      fitTime = 0,
+      lastView = props.view,
+      wasIsolated = false,
+      lastStep = -1;
+    const resize = () => {
+      const w = host.clientWidth,
+        h = host.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      dirty = true;
+      framing = 1;
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(host);
+    resize();
+    controls.addEventListener('change', () => {
+      dirty = true;
+    });
+    controls.addEventListener('start', () => {
+      framing = 0;
+    });
+    const pointer = new T.Vector2(),
+      ray = new T.Raycaster();
+    let down = { x: 0, y: 0 };
+    const onDown = (e: PointerEvent) => {
+        down = { x: e.clientX, y: e.clientY };
+      },
+      onUp = (e: PointerEvent) => {
+        if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+        const r = renderer.domElement.getBoundingClientRect();
+        pointer.set(
+          ((e.clientX - r.left) / r.width) * 2 - 1,
+          (-(e.clientY - r.top) / r.height) * 2 + 1,
+        );
+        ray.setFromCamera(pointer, camera);
+        for (const h of ray.intersectObjects(phone.pickables, false)) {
+          let node: T.Object3D | null = h.object,
+            visible = true,
+            id = '';
+          while (node) {
+            visible = visible && node.visible;
+            if (node.userData.part) id = node.userData.part;
+            node = node.parent;
+          }
+          if (visible && id) {
+            latest.current.onSelect(id);
+            break;
+          }
+        }
+      };
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointerup', onUp);
+    const contextLost = (e: Event) => {
+      e.preventDefault();
+      latest.current.onError(
+        'The graphics context was interrupted. Reload to restore the studio.',
+      );
+    };
+    renderer.domElement.addEventListener('webglcontextlost', contextLost);
+    function fit(p: Props) {
+      box.makeEmpty();
+      phone.root.updateMatrixWorld(true);
+      for (const a of phone.assemblies)
+        if (a.node.visible) box.expandByObject(a.node);
+      if (box.isEmpty()) return;
+      box.getSize(size);
+      box.getCenter(center);
+      const height = Math.max(size.y, size.x / camera.aspect),
+        distance =
+          (height / 2 / Math.tan(T.MathUtils.degToRad(camera.fov / 2))) * 1.17 +
+          size.z * 0.4;
+      targetPosition.copy(center);
+      if (p.isolated) {
+        direction.set(0.25, 0.12, 1).normalize();
+      } else {
+        direction.copy(camera.position).sub(controls.target).normalize();
+        if (direction.length() < 0.1) direction.set(0, 0.06, 1);
+      }
+      wantedCamera
+        .copy(center)
+        .addScaledVector(
+          direction,
+          Math.max(1.8, distance) * Math.pow(0.85, p.zoom),
+        );
+    }
+    function tick(now: number) {
+      frameId = requestAnimationFrame(tick);
+      const dt = frameDelta(now, prev);
+      prev = now;
+      if (document.hidden) return;
+      const p = latest.current;
+      const state = JSON.stringify([
+        p.explode,
+        p.selected,
+        p.isolated,
+        p.color,
+        p.view,
+        p.zoom,
+        p.step,
+        p.labels,
+        p.playing,
+      ]);
+      if (state !== last) {
+        last = state;
+        dirty = true;
+        framing = 1.35;
+        const colors =
+          p.color === 'silver'
+            ? ['#b1b9c3', '#a5adb7', '#c5ced8']
+            : p.color === 'orange'
+              ? ['#b86632', '#cd9b79', '#d0935c']
+              : ['#26384e', '#425064', '#52657c'];
+        phone.materials.metal.color.set(colors[0]);
+        phone.materials.rear.color.set(colors[1]);
+        phone.materials.polished.color.set(colors[2]);
+        phone.materials.logoMat.color.set(
+          p.color === 'silver'
+            ? '#787f88'
+            : p.color === 'orange'
+              ? '#a77755'
+              : '#71859d',
+        );
+        if (
+          lastView !== p.view ||
+          wasIsolated !== p.isolated ||
+          lastStep !== p.step
+        ) {
+          lastView = p.view;
+          wasIsolated = p.isolated;
+          lastStep = p.step;
+          orientationGoal.set(
+            p.isolated ? -0.07 : -0.12,
+            p.step === 4 || p.view % 2
+              ? Math.PI + 0.38
+              : p.isolated
+                ? -0.12
+                : -0.5,
+            0,
+          );
+          camera.position.copy(controls.target).add(vec(0, 0.5, 13));
+        }
+        seenZoom = p.zoom;
+        if (shownPhoto !== (p.step === 4)) {
+          shownPhoto = p.step === 4;
+          phone.drawScreen(shownPhoto);
+        }
+      }
+      const target = p.isolated ? 1 : p.explode;
+      const damp = reduced ? 1 : 1 - Math.exp(-dt * 6);
+      if (Math.abs(amount - target) > 0.0001) {
+        amount = T.MathUtils.lerp(amount, target, damp);
+        dirty = true;
+        framing = Math.max(framing, 0.85);
+      }
+      const shell = T.MathUtils.smoothstep(amount, 0, 0.25),
+        systems = T.MathUtils.smoothstep(amount, 0.22, 0.56),
+        spread = T.MathUtils.smoothstep(amount, 0.56, 0.84),
+        detail = T.MathUtils.smoothstep(amount, 0.8, 1);
+      for (const a of phone.assemblies) {
+        a.node.visible = p.isolated
+          ? p.selected === a.id
+          : amount > 0.06 ||
+            ['frame', 'back', 'display', 'camera', 'telephoto'].includes(a.id);
+        const exterior = ['frame', 'back', 'display'].includes(a.id);
+        const desired = a.home
+          .clone()
+          .lerp(a.opened, exterior ? shell : systems)
+          .lerp(a.overview, spread);
+        if (p.isolated) desired.set(0, 0, 0);
+        if (a.node.position.distanceToSquared(desired) > 1e-7) {
+          a.node.position.lerp(desired, damp);
+          dirty = true;
+          framing = Math.max(framing, 0.85);
+        }
+        // The display turns toward the viewer only after the enclosure has opened.
+        const displayRotation =
+          a.id === 'display' && !p.isolated ? Math.PI * spread : 0;
+        if (Math.abs(a.node.rotation.y - displayRotation) > 0.001) {
+          a.node.rotation.y = T.MathUtils.lerp(
+            a.node.rotation.y,
+            displayRotation,
+            damp,
+          );
+          dirty = true;
+        }
+        for (const piece of a.pieces) {
+          const d = piece.home
+            .clone()
+            .addScaledVector(piece.offset, detail * (p.isolated ? 1.25 : 1));
+          if (piece.node.position.distanceToSquared(d) > 1e-7) {
+            piece.node.position.lerp(d, damp);
+            dirty = true;
+            framing = Math.max(framing, 0.85);
+          }
+        }
+      }
+      if (p.rotating && !reduced) {
+        phone.root.rotation.y += dt * 0.13;
+        orientationGoal.y = phone.root.rotation.y;
+        dirty = true;
+      } else {
+        const yaw = Math.atan2(
+          Math.sin(orientationGoal.y - phone.root.rotation.y),
+          Math.cos(orientationGoal.y - phone.root.rotation.y),
+        );
+        if (
+          Math.abs(yaw) > 0.001 ||
+          Math.abs(phone.root.rotation.x - orientationGoal.x) > 0.001
+        ) {
+          phone.root.rotation.y += yaw * damp;
+          phone.root.rotation.x = T.MathUtils.lerp(
+            phone.root.rotation.x,
+            orientationGoal.x,
+            damp,
+          );
+          dirty = true;
+          framing = Math.max(framing, 0.7);
+        }
+      }
+      floor.visible = base.visible = !p.isolated && amount < 0.57;
+      floorMaterial.opacity = baseMaterial.opacity =
+        1 - T.MathUtils.smoothstep(amount, 0.3, 0.56);
+      const photoActive = p.step >= 0 && p.step < 4;
+      lightPath.visible = photoActive;
+      dots.forEach((d) => (d.visible = photoActive));
+      if (photoActive) {
+        if (p.playing && !reduced) flowTime += dt;
+        const a = phone.assemblies.find((a) => a.id === p.selected)!;
+        a.node.updateWorldMatrix(true, true);
+        let pts: T.Vector3[];
+        if (p.step === 1) {
+          pts = [
+            vec(0, 0, 1.4),
+            vec(0, 0, 0.35),
+            vec(0.2, -0.26, 0.05),
+            vec(-0.1, -0.4, -0.1),
+            vec(0.2, -0.55, 0.03),
+            vec(0, -0.85, -0.3),
+          ].map((v) => a.node.localToWorld(v));
+        } else if (p.step === 3) {
+          pts = [
+            vec(-0.65, -0.8, 0.5),
+            vec(-0.4, -0.1, 0.5),
+            vec(0, 0.39, 0.55),
+            vec(0.6, 0.39, 0.55),
+          ].map((v) => a.node.localToWorld(v));
+        } else {
+          pts = [
+            vec(-0.862, 0.382, 1.6),
+            vec(-0.862, 0.382, 0.85),
+            vec(-0.862, 0.382, 0.1),
+            vec(-0.862, 0.382, -0.7),
+          ].map((v) => a.node.localToWorld(v));
+        }
+        lightGeometry.setFromPoints(pts);
+        const curve = new T.CatmullRomCurve3(pts);
+        dots.forEach((d, i) =>
+          d.position.copy(curve.getPoint((flowTime / 3.6 + i / 12) % 1)),
+        );
+        dirty = true;
+      }
+      if (framing > 0) {
+        framing -= dt;
+        fitTime += dt;
+        if (fitTime > 0.08) {
+          fitTime = 0;
+          fit(p);
+        }
+        camera.position.lerp(wantedCamera, damp);
+        controls.target.lerp(targetPosition, damp);
+        dirty = true;
+      }
+      controls.update();
+      if (dirty) {
+        phone.root.updateMatrixWorld(true);
+        camera.updateMatrixWorld();
+        for (const { a, b } of markers) {
+          const show =
+            (p.labels || p.selected === a.id) &&
+            a.node.visible &&
+            !p.isolated &&
+            p.step < 0;
+          if (!show) {
+            b.hidden = true;
+            continue;
+          }
+          box.setFromObject(a.node);
+          box.getCenter(world);
+          world.project(camera);
+          b.hidden =
+            world.z > 1 ||
+            world.z < -1 ||
+            Math.abs(world.x) > 1 ||
+            Math.abs(world.y) > 1;
+          if (!b.hidden) {
+            b.style.left = (world.x * 0.5 + 0.5) * host.clientWidth + 'px';
+            b.style.top = (-world.y * 0.5 + 0.5) * host.clientHeight + 'px';
+            b.classList.toggle('selected', p.selected === a.id);
+          }
+        }
+        renderer.shadowMap.needsUpdate = true;
+        if (p.isolated) {
+          (dof.uniforms as Record<string, { value: number }>).focus.value =
+            camera.position.distanceTo(controls.target);
+          composer.render();
+        } else renderer.render(scene, camera);
+        dirty = false;
+      }
+    }
+    frameId = requestAnimationFrame(tick);
+    latest.current.onReady();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+      controls.dispose();
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('webglcontextlost', contextLost);
+      markers.forEach((m) => m.b.remove());
+      phone.dispose();
+      env.dispose();
+      floorGeo.dispose();
+      floorMaterial.dispose();
+      baseGeo.dispose();
+      baseMaterial.dispose();
+      lightGeometry.dispose();
+      lineMaterial.dispose();
+      dotGeometry.dispose();
+      dotMaterial.dispose();
+      dof.dispose();
+      composer.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, []);
+  return <div ref={el} className="three-host" />;
+}

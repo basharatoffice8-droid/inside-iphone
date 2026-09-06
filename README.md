@@ -1,23 +1,28 @@
 # Inside iPhone — 17 Pro
-Original browser-rendered educational study. React, Three.js and Shadcn components; no Blender or Unreal Engine required.
 
-## Features
-10 selectable illustrative assemblies, explode slider, isolate, orbit, flip, zoom, three finishes and a four-stage photo journey.
+Interactive browser study built with React, Three.js and Shadcn primitives. No Blender or Unreal installation is required.
 
-## Sources and scope
-- Exterior proportions and feature descriptions: https://www.apple.com/iphone-17-pro/specs/
-- Thermal system reference: https://www.ifixit.com/News/113388/iphone-17-pro-teardown
-- Interaction patterns studied: https://github.com/ashemag/human-atlas and https://github.com/ashemag/model-x-studio
-No code or 3D assets were copied from those repositories. Internal geometry and signal paths are conceptual illustrations, not exact hardware, repair guidance or OEM part identifiers.
+## Experience
+- 17 selectable assembly groups, with semantic subassemblies and miniature surface details.
+- Four progressive disassembly stages after the assembled state: enclosure, systems, overview and component detail.
+- Isolated macro inspection, subtle depth of field, orbit, flip, zoom, labels and three finishes.
+- Five-step photo journey with pause, previous/next, replay and a photograph on the reassembled display.
+- Collapsible assembly navigation and layouts for desktop and narrow screens.
 
-## Development
+## Reference and scope
+Exterior landmarks reference Apple's iPhone 17 Pro dimensional drawing. Component categories and broad arrangement reference Apple's recycler diagram and iFixit's teardown. The geometry, optical paths, connectors and sub-part counts remain illustrative. This is not an exact device scan, optical prescription, OEM catalogue or repair guide.
+
+Sources are linked in app/parts.ts and the About dialog. The Apple mark outline is from Simple Icons; Apple retains its trademark rights. The landscape photograph is by Sergei Gussev / StockSnap (CC0). Model X Studio and Human Atlas informed the original interaction concept; their 3D assets are not included.
+
+A downloadable third-party exterior model was considered, but a verified directly usable asset was not obtained. This version uses authored geometry so that the exterior and disassembly share the same model.
+
+## Development and checks
 npm ci
 npm run dev
-
-## Validation
 npx tsc --noEmit
+node --experimental-strip-types scripts/validate-motion.mjs
 npm run build
 
-Optional WebMCP registration is feature-detected. No supported browser validation context was used; its runtime contract is unverified. Browser/device visual performance QA has not been performed.
+The motion regression check covers nonmonotonic animation timestamps and verifies bounded convergence. Browser visual checks cover assembled/exploded states, camera macro, photo reveal, pause, reset, finish switching, and a 390-pixel layout. These are not measured frame-rate benchmarks or exhaustive device coverage.
 
-Photo: Sergei Gussev / StockSnap, CC0. https://stocksnap.io/photo/mountain-landscape-1YYGRD3S8N
+Optional WebMCP registration is feature-detected and validates assembly IDs and the 0–100 explosion range.
